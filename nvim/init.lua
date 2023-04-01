@@ -1,3 +1,4 @@
+-- Credit: https://github.com/nvim-lua/kickstart.nvim/blob/master/init.lua
 -- Set <space> as the leader key
 -- See `:help mapleader`
 --  NOTE: Must happen before plugins are required (otherwise wrong leader will be used)
@@ -32,8 +33,6 @@ require('lazy').setup({
   -- fugitive.vim: Run any git command from vim with `Git: <cmd>`
   'tpope/vim-fugitive',
   -- Erhubarb.vim: Enables :GBrowse from fugitive.vim to open GitHub URLs
-  'tpope/vim-rhubarb',
-  'tpope/vim-rhubarb',
   'tpope/vim-rhubarb',
 
   -- Detect tabstop and shiftwidth automatically
@@ -153,6 +152,8 @@ require('lazy').setup({
   --    An additional note is that if you only copied in the `init.lua`, you can just comment this line
   --    to get rid of the warning telling you that there are not plugins in `lua/custom/plugins/`.
   -- { import = 'custom.plugins' },
+
+  'mbbill/undotree',
 }, {})
 
 -- [[ Setting options ]]
@@ -246,6 +247,7 @@ vim.keymap.set('n', '<leader>/', function()
 end, { desc = '[/] Fuzzily search in current buffer' })
 
 vim.keymap.set('n', '<leader>sf', require('telescope.builtin').find_files, { desc = '[S]earch [F]iles' })
+-- vim.keymap.set('n', '<leader>sx', require('telescope.builtin').git_files, { desc = '[S]earch [G]it [F]iles' })
 vim.keymap.set('n', '<leader>sh', require('telescope.builtin').help_tags, { desc = '[S]earch [H]elp' })
 vim.keymap.set('n', '<leader>sw', require('telescope.builtin').grep_string, { desc = '[S]earch current [W]ord' })
 vim.keymap.set('n', '<leader>sg', require('telescope.builtin').live_grep, { desc = '[S]earch by [G]rep' })
@@ -387,6 +389,16 @@ local servers = {
     },
   },
 }
+
+-- LSP custom configs (@lion)
+-- See type information of the variable under the cursor without navigating to definition
+vim.keymap.set('n', '<leader>t', vim.lsp.buf.hover(), { desc = "Trigger [T]ype information on hover" })
+-- vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, { desc = "Go to previous diagnostic message" })
+-- vim.api.nvim_set_keymap('n', '<Leader>t', '<cmd>lua vim.lsp.buf.hover()<CR>', {noremap = true, silent = true})
+
+-- Undotree config (@lion)
+require('undotree').setup()
+vim.keymap.set('n', '<leader>u', vim.cmd.UndotreeToggle)
 
 -- Setup neovim lua configuration
 require('neodev').setup()
