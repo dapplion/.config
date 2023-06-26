@@ -49,12 +49,16 @@ require('lazy').setup({
 
       -- Useful status updates for LSP
       -- NOTE: `opts = {}` is the same as calling `require('fidget').setup({})`
-      { 'j-hui/fidget.nvim', opts = {} },
+      { 'j-hui/fidget.nvim', tag = 'legacy', opts = {} },
 
       -- Additional lua configuration, makes nvim stuff amazing!
       'folke/neodev.nvim',
     },
   },
+
+  -- Force the correct version of RustFmt command
+  -- From: https://github.com/rust-lang/rust.vim/issues/461#issuecomment-1005313227
+  'rust-lang/rust.vim',
 
   { -- Autocompletion
     'hrsh7th/nvim-cmp',
@@ -136,6 +140,8 @@ require('lazy').setup({
       pcall(require('nvim-treesitter.install').update { with_sync = true })
     end,
   },
+  -- Sticky top bar of higher sytax context. Recommended by PrimeAgen
+  { 'nvim-treesitter/nvim-treesitter-context' },
 
   -- NOTE: Next Step on Your Neovim Journey: Add/Configure additional "plugins" for kickstart
   --       These are some example plugins that I've included in the kickstart repository.
@@ -154,6 +160,9 @@ require('lazy').setup({
   -- { import = 'custom.plugins' },
 
   'mbbill/undotree',
+
+  -- Autocomment text, recommended from https://www.reddit.com/r/neovim/comments/xykklt/how_can_i_configure_commentnvim_to_comment_and/
+  'numToStr/Comment.nvim'
 }, {})
 
 -- [[ Setting options ]]
@@ -161,10 +170,19 @@ require('lazy').setup({
 
 -- Set highlight on search
 vim.o.hlsearch = false
+-- Keep displaying search as typed for feedback
+vim.o.incsearch = true
+-- Show hidden files by default
+vim.o.hidden = true
 
 -- Make line numbers default
 vim.wo.number = true
 vim.o.relativenumber = true
+
+-- Always display fat-cursor
+vim.o.guicursor = ''
+-- Always have 8 lines of visual when scrolling veritcally
+vim.o.scrolloff = 8
 
 -- Enable mouse mode
 vim.o.mouse = 'a'
@@ -208,6 +226,26 @@ vim.keymap.set({ 'n', 'v' }, '<Space>', '<Nop>', { silent = true })
 vim.keymap.set('n', 'k', "v:count == 0 ? 'gk' : 'k'", { expr = true, silent = true })
 vim.keymap.set('n', 'j', "v:count == 0 ? 'gj' : 'j'", { expr = true, silent = true })
 
+-- Remaps by theprimeagen, ref https://youtu.be/w7i4amO_zaE?t=1547
+-- J, K: Move highlighted section up or down and automatically indent
+vim.keymap.set('v', 'J', ":m '>+1<CR>gv=gv")
+vim.keymap.set('v', 'K', ":m '>-2<CR>gv=gv")
+-- J: Move line below to end of current line without moving cursor to end of line
+vim.keymap.set('n', 'J', 'mzJ`z')
+-- C-d, C-u, jump half page up or down keeping the cursor in the middle
+vim.keymap.set('v', '<C-d>', '<C-d>zz')
+vim.keymap.set('v', '<C-u>', '<C-u>zz')
+vim.keymap.set('n', '<C-d>', '<C-d>zz')
+vim.keymap.set('n', '<C-u>', '<C-u>zz')
+-- n, N: When searching, keep the cursor in the middle
+vim.keymap.set('n', 'n', 'nzzzv')
+vim.keymap.set('n', 'N', 'Nzzzv')
+
+-- RUST
+-- From: https://github.com/rust-lang/rust.vim/blob/889b9a7515db477f4cb6808bef1769e53493c578/README.md?plain=1#L73
+vim.g.rustfmt_autosave = 1
+
+
 -- [[ Highlight on yank ]]
 -- See `:help vim.highlight.on_yank()`
 local highlight_group = vim.api.nvim_create_augroup('YankHighlight', { clear = true })
@@ -229,7 +267,17 @@ require('telescope').setup {
         ['<C-d>'] = false,
       },
     },
+    file_ignore_patterns = {
+      "^.git/",
+      "node_modules",
+      "__pycache__"
+    },
   },
+  pickers = {
+    find_files = {
+      hidden = true
+    }
+  }
 }
 
 -- Enable telescope fzf native, if installed
@@ -247,7 +295,7 @@ vim.keymap.set('n', '<leader>/', function()
 end, { desc = '[/] Fuzzily search in current buffer' })
 
 vim.keymap.set('n', '<leader>sf', require('telescope.builtin').find_files, { desc = '[S]earch [F]iles' })
--- vim.keymap.set('n', '<leader>sx', require('telescope.builtin').git_files, { desc = '[S]earch [G]it [F]iles' })
+vim.keymap.set('n', '<leader>sG', require('telescope.builtin').git_files, { desc = '[S]earch [G]it [F]iles' })
 vim.keymap.set('n', '<leader>sh', require('telescope.builtin').help_tags, { desc = '[S]earch [H]elp' })
 vim.keymap.set('n', '<leader>sw', require('telescope.builtin').grep_string, { desc = '[S]earch current [W]ord' })
 vim.keymap.set('n', '<leader>sg', require('telescope.builtin').live_grep, { desc = '[S]earch by [G]rep' })
@@ -379,8 +427,16 @@ local servers = {
   -- clangd = {},
   -- gopls = {},
   -- pyright = {},
-  rust_analyzer = {},
-  -- tsserver = {},
+  rust_analyzer = {
+    cargo = {
+      unsetTest = {
+        "core",
+        "tokio",
+        "tokio-macros",
+      }
+    }
+  },
+  tsserver = {},
 
   lua_ls = {
     Lua = {
@@ -392,12 +448,11 @@ local servers = {
 
 -- LSP custom configs (@lion)
 -- See type information of the variable under the cursor without navigating to definition
-vim.keymap.set('n', '<leader>t', vim.lsp.buf.hover(), { desc = "Trigger [T]ype information on hover" })
+vim.keymap.set('n', '<leader>t', vim.lsp.buf.hover, { desc = "Trigger [T]ype information on hover" })
 -- vim.keymap.set('n', '[d', vim.diagnostic.goto_prev, { desc = "Go to previous diagnostic message" })
 -- vim.api.nvim_set_keymap('n', '<Leader>t', '<cmd>lua vim.lsp.buf.hover()<CR>', {noremap = true, silent = true})
 
 -- Undotree config (@lion)
-require('undotree').setup()
 vim.keymap.set('n', '<leader>u', vim.cmd.UndotreeToggle)
 
 -- Setup neovim lua configuration
@@ -406,6 +461,9 @@ require('neodev').setup()
 -- nvim-cmp supports additional completion capabilities, so broadcast that to servers
 local capabilities = vim.lsp.protocol.make_client_capabilities()
 capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities)
+
+-- Ref https://github.com/numToStr/Comment.nvim/blob/176e85eeb63f1a5970d6b88f1725039d85ca0055/README.md?plain=1#L55
+require('Comment').setup()
 
 -- Setup mason so it can manage external tooling
 require('mason').setup()
