@@ -58,9 +58,7 @@ require('lazy').setup({
     },
   },
 
-  -- Force the correct version of RustFmt command
-  -- From: https://github.com/rust-lang/rust.vim/issues/461#issuecomment-1005313227
-  'rust-lang/rust.vim',
+  -- Rust tooling via lspconfig rust_analyzer (configured below)
 
   { -- Autocompletion
     'hrsh7th/nvim-cmp',
@@ -104,12 +102,13 @@ require('lazy').setup({
     },
   },
 
-  { -- Add indentation guides even on blank lines
+  { -- Add indentation guides even on blank lines (ibl, v3)
     'lukas-reineke/indent-blankline.nvim',
-    -- Enable `lukas-reineke/indent-blankline.nvim`
-    -- See `:help indent_blankline.txt`
-    -- LION: no longer needed after version 3
-    -- opts = { char = '┊', show_trailing_blankline_indent = false, },
+    main = 'ibl',
+    opts = {
+      -- Disable scope highlight to avoid the colored sidebar line
+      scope = { enabled = false },
+    },
   },
 
   -- "gc" to comment visual regions/lines
@@ -136,9 +135,7 @@ require('lazy').setup({
     dependencies = {
       'nvim-treesitter/nvim-treesitter-textobjects',
     },
-    config = function()
-      pcall(require('nvim-treesitter.install').update { with_sync = true })
-    end,
+    build = ':TSUpdate',
   },
   -- Sticky top bar of higher sytax context. Recommended by PrimeAgen
   { 'nvim-treesitter/nvim-treesitter-context' },
@@ -160,10 +157,10 @@ require('lazy').setup({
   -- { import = 'custom.plugins' },
 
   'mbbill/undotree',
-
-  -- Autocomment text, recommended from https://www.reddit.com/r/neovim/comments/xykklt/how_can_i_configure_commentnvim_to_comment_and/
-  'numToStr/Comment.nvim'
-}, {})
+}, {
+  -- Prefer SSH for plugin fetches to avoid HTTPS credential prompts
+  git = { url_format = 'git@github.com:%s.git' },
+})
 
 -- [[ Setting options ]]
 -- See `:help vim.o`
@@ -240,11 +237,6 @@ vim.keymap.set('n', '<C-u>', '<C-u>zz')
 -- n, N: When searching, keep the cursor in the middle
 vim.keymap.set('n', 'n', 'nzzzv')
 vim.keymap.set('n', 'N', 'Nzzzv')
-
--- RUST
--- From: https://github.com/rust-lang/rust.vim/blob/889b9a7515db477f4cb6808bef1769e53493c578/README.md?plain=1#L73
-vim.g.rustfmt_autosave = 1
-
 
 -- [[ Highlight on yank ]]
 -- See `:help vim.highlight.on_yank()`
@@ -427,14 +419,21 @@ local servers = {
   -- clangd = {},
   gopls = {},
   pyright = {},
+  ts_ls = {},
+
   rust_analyzer = {
     ['rust-analyzer'] = {
-      cargo = { unsetTest = { "core", "tokio", "tokio-macros" }, },
-      -- checkOnSave = false
-      check = { command = "fmt" },
-    }
+      cargo = {
+        allFeatures = true,
+        autoreload = false,
+        buildScripts = { enable = false },
+      },
+      -- Disable rust-analyzer checks; short-circuit any triggered check to a no-op
+      checkOnSave = { enable = false, overrideCommand = { 'true' } },
+      check = { enable = false, command = 'check', overrideCommand = { 'true' } },
+      procMacro = { enable = false },
+    },
   },
-  tsserver = {},
 
   lua_ls = {
     Lua = {
@@ -460,6 +459,14 @@ require('neodev').setup()
 local capabilities = vim.lsp.protocol.make_client_capabilities()
 capabilities = require('cmp_nvim_lsp').default_capabilities(capabilities)
 
+-- Format Rust on save via LSP (rust-analyzer client)
+vim.api.nvim_create_autocmd('BufWritePre', {
+  pattern = '*.rs',
+  callback = function()
+    vim.lsp.buf.format { async = false }
+  end,
+})
+
 -- Ref https://github.com/numToStr/Comment.nvim/blob/176e85eeb63f1a5970d6b88f1725039d85ca0055/README.md?plain=1#L55
 require('Comment').setup()
 
@@ -473,15 +480,18 @@ mason_lspconfig.setup {
   ensure_installed = vim.tbl_keys(servers),
 }
 
-mason_lspconfig.setup_handlers {
-  function(server_name)
-    require('lspconfig')[server_name].setup {
-      capabilities = capabilities,
+-- Set up language servers (vim.lsp.config in 0.11+)
+for server_name, server_settings in pairs(servers) do
+  local cfg = vim.lsp.config[server_name]
+  if type(cfg) == 'table' then
+    cfg = vim.tbl_deep_extend('force', cfg, {
       on_attach = on_attach,
-      settings = servers[server_name],
-    }
-  end,
-}
+      capabilities = capabilities,
+      settings = server_settings,
+    })
+    vim.lsp.start(cfg)
+  end
+end
 
 -- nvim-cmp setup
 local cmp = require 'cmp'
@@ -530,4 +540,3 @@ cmp.setup {
 
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
-
